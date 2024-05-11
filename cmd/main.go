@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -163,15 +164,126 @@ func findAllBooks(coll *mongo.Collection) []map[string]interface{} {
 	var ret []map[string]interface{}
 	for _, res := range results {
 		ret = append(ret, map[string]interface{}{
-			"ID":         res.ID.Hex(),
-			"BookName":   res.BookName,
-			"BookAuthor": res.BookAuthor,
-			"BookISBN":   res.BookISBN,
-			"BookPages":  res.BookPages,
+			"id":     res.ID.Hex(),
+			"name":   res.BookName,
+			"author": res.BookAuthor,
+			"isbn":   res.BookISBN,
+			"pages":  res.BookPages,
+			"year":   res.BookYear,
 		})
 	}
 
 	return ret
+}
+
+func addBook(client *mongo.Client, coll *mongo.Collection, book map[string]interface{}) {
+
+	new_book := BookStore{}
+	_, ok := book["isbn"]
+	if ok {
+		new_book = BookStore{
+			BookName:   book["name"].(string),
+			BookAuthor: book["author"].(string),
+			BookPages:  int(book["pages"].(float64)),
+			BookYear:   int(book["year"].(float64)),
+			BookISBN:   book["isbn"].(string),
+		}
+	} else {
+		new_book = BookStore{
+			BookName:   book["name"].(string),
+			BookAuthor: book["author"].(string),
+			BookPages:  int(book["pages"].(float64)),
+			BookYear:   int(book["year"].(float64)),
+		}
+	}
+
+	result, err := coll.InsertOne(context.TODO(), new_book)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Printf("New book successfully added, here is it below:\n")
+		fmt.Printf("%+v\n", result)
+	}
+}
+
+func updateBook(client *mongo.Client, coll *mongo.Collection, book map[string]interface{}) interface{} {
+
+	fmt.Printf("Here is the ID to update book: ")
+	fmt.Printf(book["id"].(string))
+	fmt.Println()
+
+	id, _ := primitive.ObjectIDFromHex(book["id"].(string))
+	filter := bson.D{{"_id", id}}
+
+	new_book := BookStore{}
+
+	_, ok := book["isbn"]
+	if ok {
+		new_book = BookStore{
+			ID:         id,
+			BookName:   book["name"].(string),
+			BookAuthor: book["author"].(string),
+			BookPages:  int(book["pages"].(float64)),
+			BookYear:   int(book["year"].(float64)),
+			BookISBN:   book["isbn"].(string),
+		}
+	} else {
+		new_book = BookStore{
+			ID:         id,
+			BookName:   book["name"].(string),
+			BookAuthor: book["author"].(string),
+			BookPages:  int(book["pages"].(float64)),
+			BookYear:   int(book["year"].(float64)),
+		}
+	}
+
+	var result bson.M
+	if err := coll.FindOneAndReplace(context.TODO(), filter, new_book).Decode(&result); err != nil {
+		fmt.Printf("Cannot find book to replace. Is ID parsed correctly?\n")
+		panic(err)
+	}
+
+	fmt.Printf("Book successfully updated, updated book:\n")
+	fmt.Printf("%+v\n", result)
+
+	return result
+}
+
+func removeBook(client *mongo.Client, coll *mongo.Collection, id string) interface{} {
+	fmt.Printf("Here is the ID to remove book: ")
+	fmt.Printf(id)
+	fmt.Println()
+
+	id_obj, _ := primitive.ObjectIDFromHex(id)
+	filter := bson.D{{"_id", id_obj}}
+
+	var result bson.M
+	// check for errors in the finding
+	if err := coll.FindOneAndDelete(context.TODO(), filter).Decode(&result); err != nil {
+		fmt.Printf("Cannot find book to remove. Is ID parsed correctly?\n")
+		panic(err)
+	}
+
+	fmt.Printf("Book successfully removed, removed book:\n")
+	fmt.Printf("%+v\n", result)
+
+	return result
+}
+
+func findBook(client *mongo.Client, coll *mongo.Collection, book map[string]interface{}) interface{} {
+	filter := bson.D{{"_id", book["id"].(string)}}
+
+	var result bson.M
+	// check for errors in the finding
+	if err := coll.FindOne(context.TODO(), filter).Decode(&result); err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
+func bookExists() bool {
+	return false
 }
 
 func main() {
@@ -241,11 +353,13 @@ func main() {
 	})
 
 	e.GET("/authors", func(c echo.Context) error {
-		return c.NoContent(http.StatusNoContent)
+		books := findAllBooks(coll)
+		return c.Render(200, "author-table", books)
 	})
 
 	e.GET("/years", func(c echo.Context) error {
-		return c.NoContent(http.StatusNoContent)
+		books := findAllBooks(coll)
+		return c.Render(200, "year-table", books)
 	})
 
 	e.GET("/search", func(c echo.Context) error {
@@ -258,6 +372,48 @@ func main() {
 
 	e.GET("/api/books", func(c echo.Context) error {
 		books := findAllBooks(coll)
+		return c.JSON(http.StatusOK, books)
+	})
+
+	e.POST("/api/books", func(c echo.Context) error {
+		books := findAllBooks(coll)
+		if bookExists() {
+			return c.JSON(304, books)
+		}
+
+		var body map[string]interface{}
+		err := json.NewDecoder(c.Request().Body).Decode(&body)
+		fmt.Printf("Here is the actual request body:\n")
+		fmt.Printf("%+v\n", body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		addBook(client, coll, body)
+
+		return c.JSON(http.StatusOK, books)
+	})
+
+	e.PUT("/api/books", func(c echo.Context) error {
+		books := findAllBooks(coll)
+
+		var body map[string]interface{}
+		err := json.NewDecoder(c.Request().Body).Decode(&body)
+		fmt.Printf("Here is the actual request body (for an UPDATE):\n")
+		fmt.Printf("%+v\n", body)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		updateBook(client, coll, body)
+
+		return c.JSON(http.StatusOK, books)
+	})
+
+	e.DELETE("/api/books/:id", func(c echo.Context) error {
+		books := findAllBooks(coll)
+		removeBook(client, coll, c.Param("id"))
+
 		return c.JSON(http.StatusOK, books)
 	})
 
