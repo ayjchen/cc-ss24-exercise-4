@@ -299,6 +299,7 @@ func main() {
 		fmt.Printf("failure to load env variable\n")
 		os.Exit(1)
 	}
+	// uri := "mongodb://localhost:27017"
 
 	// TODO: make sure to pass the proper username, password, and port
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
