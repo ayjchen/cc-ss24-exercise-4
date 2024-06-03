@@ -1,171 +1,93 @@
-## Exercise 2 for Cloud Computing ##
+## Exercise 3 for Cloud Computing
 
-### Summer Semester 2024 ###
+### Summer Semester 2024
 
-#### For more enquiries, please contact me ####
+#### For more enquiries, please contact me
 
 Dear students,
 
-Welcome to the second exercise for Cloud Computing. After such hectic weeks, let's
-dive a bit more into automation, because what could go wrong, right? 
+Welcome to the third exercise for Cloud Computing. Now that you are experts on
+Docker Compose, we are gonna explore building microservices (kind of, the idea
+still holds).
 
-During this assignment, you will learn how to install, use, and conquer the 
-Docker Engine to virtualize all your applications! It makes a simple transition
-whenever you want to try Github Actions (automating your code on repository changes)
+During this assignment, you will explore the requirements of minimalizing your
+containers for deploying microservices! You will also explore using a Load Balancer
+to orchestrate traffic accross different endpoints.
 
-The code base is the same as for the Exercise 1: feel free to change the `main.go`
-and `index.html` to accomodate for your changes. However, you will need create a
-few more files to pass this assignment. Let's see what this assignment needs!
+As previous assignments, we will build on top of your existing code, which you
+will partition into smaller to generate **five** different containers. So, what
+is the task?
 
-> The code is available on [Github](https://github.com/CAPS-Cloud/cc-ss24-exercise-2)
+### The challenge
 
-### What is the task? ###
+To succeed in this assignment, you must do the following:
 
-As you have seen in Piazza, during this assignment, you can continue submitting
-your solution for Exercise 1 as you need it to pass both assignments. Additionally, 
-you need to do:
+1. Use Docker Compose to orchestrate your **five** containers and deploy **NGINX**
+to control the traffic between your services based on the request method. The
+containers are as follows:
+    - A container to handle each operation for `/api/books`: GET, POST, PUT, and DELETE
+    - A container to handle requests to `/*`, i.e., the rendering of the webpage.
+    - A container for NGINX.
+2. Use a Multi-stage Dockerfile to minimize the size of the image.
+3. Publish to a public container registry (e.g., Docker Hub) your images.
 
-1. Install the Docker Engine (see instructions below) on your machine and VM.
-2. Create a **Dockerfile** that builds your application into an image.
-3. Push your image into your Docker Registry Account (only public registries allowed!)
-4. Use the Docker Engine to run MongoDB and your application on your VM.
+### Requirements and Test Scenarios
 
-The setup for MongoDB in your application has changed: instead of using a 
-predefined URI (mongodb://...), you will have to **export** an *environment variable*, 
-which couples with the automated tests and my automatic instance. Make sure to
-provide the proper URI when running your applcation on your VM (hint: maybe you
-use **Docker Compose**)
+#### Requirements
 
-### Requirements and Test Scenarios ###
+* You must create all images for `x86_64` (i.e., `amd64`).
+* You must use a DB: you can run it as a container or install it directly in your VM.
+* Create unique code-bases to handle each operation (GET, POST, PUT, DELETE, and
+server-side rendering) by decoupling the current code structure.
+* The URI for MongoDB must be given via an **environment variable**.
+* The traffic must be redirected via **NGINX** by checking the request's method.
+* Do not modify the headers inserted by NGINX.
+* The automated tests from Exercise 1 must pass.
 
-#### Requirements ####
+#### Tests
 
-1. You must create an **amd64** image (careful for those running ARM/Apple Silicon)
-2. You must run your application and MongoDB using Docker 
-3. The URI for MongoDB must be given via an **environment variable** 
-(it is already in the code, you must define it before running your application)
-4. The exposed port describe in your Dockerfile must match with your application
-port.
-5. The automated tests from Exercise 1 must pass.
+1. Using an insolated MongoDB instance, the submission server will download, configure, and
+run all of your images. (10 pts).
+2. Using the isolated instance, the submission server will perform tests to the 
+different available endpoints (45 pts).
+3. Using your VM, the submission server will perform tests with the given endpoint
+and check that you are running **NGINX** with proper configuration (45 pts). Please
+make sure the port in the given port matches the exposed one for NGINX.
 
-#### Tests ####
+### What do you need for this assignment?
 
-1. Using an isolated MongoDB instance, the server will download, configure, and
-run your image (10 pts).
-2. Using my local execution of your application, I will perform the same tests as
-Exercise 1 (45 pts).
-3. Using the endpoint, I will perform the same tests as those locally (45 pts).
+The starting point is the code from your last exercise and your existing 
+Docker Compose file. From there, you will have to expand such file to include:
 
-### What do you need for this assignment? ###
+- The configuration for NGINX. NGINX can be configured using an `nginx.conf` file
+that you must pass to the respective container by mounting a volume into the
+respective path. Please look at [this tutorial](https://www.digitalocean.com/community/tutorials/understanding-the-nginx-configuration-file-structure-and-configuration-contexts) by Digitial Ocean,
+which explains the structure of the file. Since we want to redirect based on
+request's methods, [this page](https://nginx.org/en/docs/http/ngx_http_core_module.html) *could* provide insightful information on how to configure your `$location`. [**Hint**](https://serverfault.com/questions/152745/nginx-proxy-by-request-method)
+- Configure your other services to start in a timely manner so they are reachable
+once NGINX is up.
+- Use MongoDB to run before everything starts.
 
-The starting point is the code from this file and your solution from the Exercise 1.
-Additionally, you need to **install** the Docker Engine.
+#### Extra options to explore
 
-#### Installing Docker ####
-> **WARNING FOR WINDOWS/MAOS USERS**
+Since we are looking to optimize the size of a microservice's container, it might 
+be useful to explore multi-stage builds to reduce the size of the final container.
+You can read more [here](https://docs.docker.com/build/building/multi-stage/) on
+how to create a multi-stage build. 
 
-> You cannot install the Command Line Interface (CLI), you have to use **Docker
-> Desktop**, that install all you need. For Windows users, please look at tutorials
-> on how to build images as I am not familiar with it. For MacOS users, after
-> installing **Docker Desktop**, you can use the CLI commands to build your 
-> images
+Basically, we want you to first build your executable: download necessary packages,
+compile your code, and deploy on a thinner container. Given the multi-stage containers,
+you can copy the compiled code (and necessary dependencies) from a previous stage
+to the current one (a smaller one). Usually, people use an `alpine` version of linux
+to deploy lightweight containers. That means, you build your code using the current heavy-
+weight Golang container, you copy the final binary, and the required files (for 
+rendering HTML) into the smaller stage, which generates a tiny image perfect 
+for microservices.
 
-To install the **Docker Engine**, please follow [this tutorial](https://docs.docker.com/engine/install/)
-depending in your Operating System. The Docker Desktop is a wrapper for the Docker Engine. For your VM,
-you must follow the Linux instructions!
+If you want to improve your code even more and remove file dependencies, Golang
+provides a neat feature called [`go-embed`](https://blog.jetbrains.com/go/2021/06/09/how-to-use-go-embed-in-go-1-16/)
+to compile a given folder into the final binary to remove dependencies with the
+host filesystem. Since I cannot check whether you are using such feature, I leave 
+it to you to explore! 
 
-> **WARNING FOR LINUX USERS**
-
-> After the installation, you will have to use `sudo` before running any command,
-> to avoid such annoyances, you can execute the following:
-```bash
-$ sudo groupadd docker # it could fail if the group already exits, ignore it
-$ sudo usermod -aG docker $USER
-$ sudo newgrp # it reloads the groups at runtime without logging out
-```
-
-(Optional) You do not need Docker Compose to run your containers, but it can
-automate building and launching contianers at will. To do so, please install it
-using [this tutorial](https://docs.docker.com/compose/install/)
-
-#### Using Docker ####
-
-Once you have installed Docker, you can use it from the CLI (Terminal) as follows:
-
-```bash
-$ sudo docker build -t <registry_url>/<username>/<image_name>:<tag> . # builds the image using the local (.) Dockerfile
-$ sudo docker image ls # Lists all local images
-$ sudo docker ps # Lists all running containers
-$ sudo docker stop <container_id> # Stops a running container, the id is shown when executing the command above
-$ sudo docker rm <container_id> # Removes an **stopped** container
-$ sudo docker rmi <image_id> # Remove an image without containers related to it
-$ sudo docker run # append the necessary options below, only --rm is optional
-                  --rm # Removes container when it exits
-                  -it # Connect to the container's terminal
-                  --name <container_id> # Gives the container a name
-                  -p "5000:6000" # Maps the internal exposed port (6000) to an external port (5000)
-                  -v <host_path>:<container_path> # mounts a volume into the container (like mounting a disk or usb stick)
-                  <image> # the name of image, the one from the first command
-                  /bin/sh # the command to run once it connects to the terminal, it depends on the virtualized OS of the container
-```
-> PS: For those with a different CPU architecture than x86_64 (ARM/Apple Silicon),
-> you will have to define the target platform your image should have. To do so,
-> you can append an option to the build command as `--platform=linux/amd64`. 
-> If you want to also run your image locally, you need to build a **multi-platform**
-> image by specifying multiple platforms separated with commas as:
-> `--platform=linux/amd64,linux/arm64`. You also need to pass the architecture
-> to the `FROM` command by doing `FROM --platform=$TARGETPLATFORM <base_image>`
-
-#### Exporting environment variables ####
-
-Since this assignment requires configurable parameters (the database's URI),
-you will have to *create variables* in your current terminal, if you run your
-application without **Docker** or **Docker Compose**. To do so, you will run:
-
-```bash
-$ export DATABASE_URI=mongodb://.... # Linux and MacOS
-setx DATABASE_URI "mongodb://..." # Windows
-```
-
-In case you are using docker containers, you need to pass those environment
-variables to the container upon running it. For this purpose, you need to append
-an argument to the `run` command by doing `-e DATABASE_URI="mongodb://...`.
-The cool feature is that you append this argument multiple times to define multiple
-environment variables. Great, right?
-
-####  [Optional] Using Docker Compose ####
-
-Since most cases consist of local development, the overhead of copying for code
-between your machine and the VM might be high. Hence, we can automate the 
-deployment of containers locally, especially to ease how connected services
-interact. For this purpose, we can use **Docker Compose**: you will
-have to create a `docker_compose.yml` file, similar to the one in the exercise
-slides.
-
-Once the file is created, you can use the following commands to launch, stop, 
-pause, and interact with the running containers:
-
-```bash
-$ sudo docker compose build # builds/rebuilds all images according to the file
-$ sudo docker compose build <image_name> # builds/rebuilds only one of the services
-$ sudo docker compose build --push # pushes the image after building
-$ sudo docker compose push # pushes the build images according to the file
-$ sudo docker compose up # (interactive) launches containers according to the file
-$ sudo docker compose up -d # (detached) launches containers according to the file in the background
-$ sudo docker compose stop # stops all containers according to the file 
-$ sudo docker compose kill # kills all containers according to the file
-$ sudo docker compose rm # removes all containers according to the file (be aware of created data at runtime and the thin R/W layer)
-```
-> Remember to define the environment variables in your **Docker Compose** for each
-> service defined in the file.
-
-> For more on how to use **Docker Compose**, you can run `sudo docker compose --help`
-> or `sudo docker compose [subcommand [subsubcommand]] --help`.
-
-> PS: when a command takes optional arguments, they are usually wrapped in square
-> brackets, as previously for `[subcommand]`. It can be a nested structure as before.
-> If the arguments can be a list and optional, it will be `[subcommand ...]`
-
-Without further ado,
-
-#### Happy Coding! ####
+### Happy Coding!
