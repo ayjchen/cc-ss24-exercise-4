@@ -35,7 +35,7 @@ services:
     ports:
       - "3033:3033"
 
-  put:
+  update:
     build:
       context: ./
       dockerfile: ./cmd/update/Dockerfile
@@ -74,5 +74,5 @@ services:
       - "render"
       - "get"
       - "post"
-      - "put"
+      - "update"
       - "delete"
